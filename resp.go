@@ -7,6 +7,7 @@ import (
 	"strconv"
 )
 
+// defines RESPtype prefixes
 const (
 	STRING  = '+'
 	ERROR   = '-'
@@ -15,6 +16,7 @@ const (
 	ARRAY   = '*'
 )
 
+// Value type - container for resp val
 type Value struct {
 	typ   string
 	str   string
@@ -31,7 +33,7 @@ func NewResp(rd io.Reader) *Resp {
 	return &Resp{reader: bufio.NewReader(rd)}
 }
 
-// this readLine func reads the RESP line & strips the \r\n
+// readLine func reads the RESP line & strips the \r\n
 func (r *Resp) readLine() (line []byte, n int, err error) {
 	for {
 		b, err := r.reader.ReadByte()
@@ -49,6 +51,8 @@ func (r *Resp) readLine() (line []byte, n int, err error) {
 			break
 		}
 	}
+
+	// returns the line content, byte read and error
 	return line[:len(line)-2], n, nil
 }
 
@@ -66,6 +70,7 @@ func (r *Resp) readInteger() (x int, n int, err error) {
 	return int(i64), n, nil
 }
 
+// Read - the first byte (resp type prefix) and calls the appropriate handler
 func (r *Resp) Read() (Value, error) {
 	_type, err := r.reader.ReadByte()
 
@@ -97,7 +102,7 @@ func (r *Resp) readArray() (Value, error) {
 
 	// for each line, parse and read the value
 	v.array = make([]Value, length)
-	for i := range length {
+	for i := 0; i < length; i++ {
 		val, err := r.Read()
 
 		if err != nil {
@@ -124,7 +129,7 @@ func (r *Resp) readBulk() (Value, error) {
 
 	r.reader.Read(bulk)
 	v.bulk = string(bulk)
-	r.readLine()
+	r.readLine() // consumes the \r\n
 
 	return v, nil
 }
