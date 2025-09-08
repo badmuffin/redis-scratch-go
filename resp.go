@@ -7,7 +7,7 @@ import (
 	"strconv"
 )
 
-// defines RESPtype prefixes
+// defines RESP type prefixes
 const (
 	STRING  = '+'
 	ERROR   = '-'
@@ -164,6 +164,7 @@ func (v Value) marshalArray() []byte {
 	// recursively calls Marshal() for each element
 	// because element could be string, array, bulk, etc
 	// ex: ["PING", "Hello"] -> "*2\r\n$4\r\nPING\r\n$5\r\nHello\r\n"
+
 	for i := 0; i < len; i++ {
 		bytes = append(bytes, v.array[i].Marshal()...)
 	}
@@ -208,4 +209,26 @@ func (v Value) marshalError() []byte {
 	bytes = append(bytes, '\r', '\n')
 
 	return bytes
+}
+
+type Writer struct {
+	writer io.Writer
+}
+
+// NewWriter - constructor function
+func NewWriter(w io.Writer) *Writer {
+	return &Writer{writer: w}
+}
+
+// Write - converts high level "VALUE" into raw RESP bytes
+// Value{typ:"string", str:"OK"} -> +OK\r\n
+func (w *Writer) Write(v Value) error {
+	var bytes = v.Marshal()
+
+	_, err := w.writer.Write(bytes)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
