@@ -2,6 +2,8 @@ package main
 
 import (
 	"bufio"
+	"errors"
+	"io"
 	"os"
 	"sync"
 	"time"
@@ -27,12 +29,12 @@ func NewAof(path string) (*Aof, error) {
 	// create a new Aof object
 	aof := &Aof{
 		file: f,
-		rd: bufio.NewReader(f),
+		rd:   bufio.NewReader(f),
 	}
 
 	// A goroutine is like a lightweight thread — it runs concurrently with the rest of the program.
 	// Background goroutine that syncs the file to disk every second to reduce data loss
-	go func(){
+	go func() {
 		for {
 			aof.mu.Lock()
 			aof.file.Sync()
@@ -44,7 +46,7 @@ func NewAof(path string) (*Aof, error) {
 	return aof, nil
 }
 
-func (aof *Aof) Close() error {
+func (aof *Aof) CloseFile() error {
 	aof.mu.Lock()
 	defer aof.mu.Unlock()
 
@@ -55,9 +57,32 @@ func (aof *Aof) Write(value Value) error {
 	aof.mu.Lock()
 	defer aof.mu.Unlock()
 
+	// write the command to the file in the same RESP format that we receive
 	_, err := aof.file.Write(value.Marshal())
 	if err != nil {
 		return err
+	}
+
+	return nil
+}
+
+// Read - read commands from the AOF file and for each command it finds, it calls your
+// callback function with that command.
+func (aof *Aof) Read(callback func(value Value)) error {
+	aof.mu.Lock()
+	defer aof.mu.Unlock()
+
+	resp := NewResp(aof.file)
+
+	for {
+		value, err := resp.Read()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			return err
+		}
+		callback(value)
 	}
 
 	return nil
